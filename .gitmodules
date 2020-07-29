@@ -1,0 +1,3 @@
+[submodule "external/kgfx"]
+	path = external/kgfx
+	url = https://github.com/perjoh/kgfx
