@@ -7,8 +7,8 @@ set(IS_GCC "$<CXX_COMPILER_ID:GNU>")
 
 function(enable_compile_options target)
     # Warning level (MSVC)
-    target_compile_options(${target} PUBLIC "$<${IS_MSVC}:/W4>")
-    target_compile_options(${target} PUBLIC "$<${IS_MSVC}:/bigobj>")
+    #target_compile_options(${target} PUBLIC "$<${IS_MSVC}:/W4>")
+    #target_compile_options(${target} PUBLIC "$<${IS_MSVC}:/bigobj>")
 
     # Optimizations GCC (Release)
     target_compile_options(${target} PUBLIC "$<$<AND:${IS_GCC},$<CONFIG:RELEASE>>:-O3>")
@@ -21,7 +21,7 @@ add_library(${PROJECT_NAME}lib STATIC   surface.cpp
 
 target_link_libraries(${PROJECT_NAME}lib PUBLIC glm 
                                                 kgfx 
-                                        PRIVATE nlohmann_json 
+                                                nlohmann_json 
                                                 nlohmann_json::nlohmann_json)
 
 target_compile_features(${PROJECT_NAME}lib PUBLIC cxx_std_17)
@@ -30,6 +30,7 @@ enable_compile_options(${PROJECT_NAME}lib)
 # Executable
 add_executable(${PROJECT_NAME} main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}lib)
+target_link_libraries(${PROJECT_NAME} "$<${IS_GCC}:rt>")
 enable_compile_options(${PROJECT_NAME})
 
 # Test executable

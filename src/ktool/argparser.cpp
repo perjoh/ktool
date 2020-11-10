@@ -5,7 +5,7 @@
 namespace ktool {
 namespace args {
 
-    std::vector<std::string> from_argv(int argc, char* argv[])
+    std::vector<std::string> from_argv(int argc, const char* argv[])
     {
         return std::vector<std::string>(&argv[0], &argv[argc]);
     }
@@ -77,6 +77,12 @@ namespace args {
         return std::stoi(s);
     }
 
+    template <>
+    char from_str(const char* s) {
+        assert(s);
+        return s[0];
+    }
+
     template <typename T>
     T Parser::Argument::value(T t_default) const
     {
@@ -89,6 +95,7 @@ namespace args {
     template std::string Parser::Argument::value<std::string>(std::string) const;
     template float Parser::Argument::value<float>(float) const; 
     template int Parser::Argument::value<int>(int) const; 
+    template char Parser::Argument::value<char>(char) const; 
 
 
 } // namespace args

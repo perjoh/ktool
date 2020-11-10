@@ -1,0 +1,37 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "variables": []
+    },
+    {
+      "name": "Linux-GCC-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "cmakeExecutable": "cmake",
+      "remoteCopySourcesExclusionList": [ ".vs", ".git", "out", "_build" ],
+      "cmakeCommandArgs": "-DCMAKE_TOOLCHAIN_FILE=\"/home/perjoh/rpi/rpivcpkg.cmake\" -DVCPKG_TARGET_TRIPLET=\"arm-linux-rpi\"",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "linux_arm" ],
+      "remoteMachineName": "-2141947198;127.0.0.1 (username=perjoh, port=2222, authentication=Password)",
+      "remoteCMakeListsRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/src",
+      "remoteBuildRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/out/build/${name}",
+      "remoteInstallRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/out/install/${name}",
+      "remoteCopySources": true,
+      "rsyncCommandArgs": "-t --delete --delete-excluded",
+      "remoteCopyBuildOutput": false,
+      "remoteCopySourcesMethod": "rsync",
+      "addressSanitizerRuntimeFlags": "detect_leaks=0",
+      "variables": []
+    }
+  ]
+}

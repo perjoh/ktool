@@ -8,7 +8,7 @@
 namespace ktool {
 namespace args {
 
-    std::vector<std::string> from_argv(int argc, char* argv[]); 
+    std::vector<std::string> from_argv(int argc, const char* argv[]); 
 
     /*
      * Render a simple cube on screen.

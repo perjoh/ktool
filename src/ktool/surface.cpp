@@ -3,14 +3,16 @@
 #include <array>
 #include <glm/geometric.hpp>
 #include <glm/gtc/epsilon.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <limits>
+#include <cassert>
 
 namespace ktool {
 
     template <typename Vec>
     bool equal_vec(const Vec& a, const Vec& b)
     {
-        const auto eps = std::numeric_limits<typename Vec::value_type>::epsilon();
+        constexpr auto eps = std::numeric_limits<typename Vec::value_type>::epsilon();
         return glm::all(glm::epsilonEqual(a, b, eps));
     }
 
@@ -23,7 +25,15 @@ namespace ktool {
 
     Surface::Surface(const Surface& rhs)
     {
-        import_raw(rhs.export_raw());
+        *this = import_raw(rhs.export_raw());
+    }
+
+    Surface::Surface(Surface&& rhs) noexcept
+        : vertices_(std::move(rhs.vertices_))
+        , edges_(std::move(rhs.edges_))
+        , faces_(std::move(rhs.faces_))
+        , dirty_indices_(false)
+    { 
     }
 
     //
@@ -168,6 +178,63 @@ namespace ktool {
     }
 
     //
+    void Surface::rotate(int axis, float angle_deg) 
+    { 
+        assert(axis < 3 && !(axis < 0));
+
+        glm::vec3 axis_v;
+        axis_v[axis] = 1.0;
+
+        auto mat = glm::rotate(glm::identity<glm::mat4>(), glm::radians(angle_deg), axis_v);
+
+        for (Vertex& vertex : vertices_) {
+            vertex.position = mat* glm::vec4{vertex.position, 1.0};
+        } 
+    }
+
+    // 
+    void Surface::skew(int axis, glm::vec3::value_type factor)
+    {
+        auto min_max = measure(); 
+        auto dim = min_max.second - min_max.first;
+ 
+        for (Vertex& vertex : vertices_) { 
+
+            const auto t = (vertex.position[axis] - min_max.first[axis])/dim[axis];
+
+            assert(t <= 1.0);
+            assert(t >= 0.0);
+
+            for (int i = 0; i < 3; ++i) {
+                if (i != axis) {
+                    auto& p = vertex.position[i];
+                    p = p*factor*t + p*(1.0f - t);
+                } 
+            } 
+        } 
+    }
+
+    //
+    std::pair<glm::vec3, glm::vec3> Surface::measure() const
+    {
+        auto v_min = vertices_.front().position;
+        auto v_max = v_min;
+
+        for (const Vertex& vertex : vertices_) {
+
+            v_min.x = std::min(v_min.x, vertex.position.x);
+            v_min.y = std::min(v_min.y, vertex.position.y);
+            v_min.z = std::min(v_min.z, vertex.position.z);
+
+            v_max.x = std::max(v_max.x, vertex.position.x);
+            v_max.y = std::max(v_max.y, vertex.position.y);
+            v_max.z = std::max(v_max.z, vertex.position.z);
+        }
+
+        return std::make_pair(v_min, v_max);
+    }
+
+    //
     bool Surface::operator==(const Surface& rhs) const
     {
         if (   vertices_.size() == rhs.vertices_.size()
@@ -176,7 +243,7 @@ namespace ktool {
         {
             auto it_b = rhs.vertices_.begin();
             for (auto it_a = vertices_.begin(); it_a != vertices_.end(); ++it_a) {
-                const auto eps = std::numeric_limits<glm::vec3::value_type>::epsilon();
+                constexpr auto eps = std::numeric_limits<glm::vec3::value_type>::epsilon();
                 if (!glm::all(glm::epsilonEqual(it_a->position, it_b->position, eps))) {
                     return false;
                 }
@@ -242,10 +309,11 @@ namespace ktool {
 
         auto& edges = new_face->edges;
 
-        for (unsigned i = 0; i < edges.size(); ++i) {
+        const unsigned edges_size = edges.size();
+        for (unsigned i = 0; i < edges_size; ++i) {
 
             // Mask any inverted edges.
-            if (check_edge(edges[i], edges[(i+1)%edges.size()])) {
+            if (check_edge(edges[i], edges[(i+1)%edges_size])) {
                 edges[i]->faces[SIDE_RIGHT] = new_face; 
             } else {
                 // Edge is inverted.
@@ -277,7 +345,17 @@ namespace ktool {
     //
     void Surface::sub_divide()
     { 
-        Surface target;
+        using namespace std;
+
+        auto raw = export_raw();
+
+        auto& polygons = get<0>(raw);
+        auto& indices = get<1>(raw);
+        auto& vertices = get<2>(raw);
+
+
+
+        //Surface target;
 
         /*
 
@@ -457,8 +535,9 @@ namespace ktool {
         for (auto vertex = vertices_.begin(); vertex != vertices_.end(); ++vertex) { 
             // Setup phase. Populate list with edges fanning out in a clock-wise 
             // order from the vertex.
-            auto edge_indices = get_edge_fan(vertex);
-            auto edges = get_edge_fan_norm(vertex, edge_indices);
+            auto edge_indices = query::edge_fan(*this, vertex);
+            auto edges = query::edge_fan_norm(vertex, edge_indices);
+            //auto edges = get_edge_fan_norm(vertex, edge_indices);
 
             assert(!(edges.size() < 3));
 
@@ -502,14 +581,49 @@ namespace ktool {
 
     //
     void Surface::to_triangles() {
+        
+        using namespace std;
 
         auto raw = export_raw();
 
-        auto& polygons = std::get<0>(raw);
-        auto& indices = std::get<1>(raw);
-        //auto& vertices = std::get<2>(raw);
+        auto& polygons = get<0>(raw);
+        auto& indices = get<1>(raw);
+        auto& vertices = get<2>(raw);
 
-        for (std::size_t i = 0; i < std:: 
+        Polygons polygons_tri;
+        Indices indices_tri;
+
+        size_t i = 0;
+        for (size_t poly = 0; poly < polygons.size(); ++poly) 
+        {
+            if (polygons[poly] == 4) 
+            { 
+                polygons_tri.push_back(3);
+                polygons_tri.push_back(3);
+
+                indices_tri.push_back(indices[i+0]);
+                indices_tri.push_back(indices[i+1]);
+                indices_tri.push_back(indices[i+2]);
+
+                indices_tri.push_back(indices[i+2]);
+                indices_tri.push_back(indices[i+3]);
+                indices_tri.push_back(indices[i+0]);
+
+                i += 4;
+            } 
+            else if (polygons[poly] == 3) 
+            { 
+                polygons_tri.push_back(3);
+
+                indices_tri.push_back(indices[i++]);
+                indices_tri.push_back(indices[i++]);
+                indices_tri.push_back(indices[i++]);
+            }
+        }
+
+        *this = import_raw(make_tuple(move(polygons_tri), move(indices_tri), move(vertices)));
+
+        //for (std::size_t i = 0; i < std:: 
 
         /*std::size_t counter = faces_.size();
 
@@ -628,7 +742,7 @@ namespace ktool {
 
     bool Surface::check_vertex_redundancy(It_vertex vertex, float tolerance) const
     {
-        auto fan = get_edge_fan_norm(vertex);
+        auto fan = query::edge_fan_norm(*this, vertex);
         return check_vertex_redundancy(fan, tolerance);
     } 
 
@@ -678,7 +792,7 @@ namespace ktool {
     void Surface::remove_edge(It_edge edge)
     { 
         auto remove_ref = [] (auto& c, It_edge e) {
-            std::remove(c.begin(), c.end(), e);
+            auto tmp = std::remove(c.begin(), c.end(), e);
         };
 
         remove_ref(edge->vertices[0]->edges, edge);

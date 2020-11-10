@@ -30,22 +30,7 @@ TEST_CASE("Constructed cube integrity tests.", "[surface]")
             }
 
             REQUIRE(edges.size() == 3);
-        });
-
-        /*for (std::size_t i = 0; i < 8; ++i) {
-            auto fan = cube.get_edge_fan_norm(i);
-            auto num_edges_sharing_vertex = fan.size();
-            REQUIRE(num_edges_sharing_vertex == 3);
-            for (auto& edge : fan) {
-                REQUIRE(edge.vertices[0] == i);
-            }
-        }
-
-        for (std::size_t i = 0; i < 8; ++i) {
-            auto fan = cube.get_face_fan(i);
-            auto num_faces_sharing_vertex = fan.size();
-            REQUIRE(num_faces_sharing_vertex == 3);
-        }*/
+        }); 
     }
 }
 

@@ -19,21 +19,26 @@ namespace io {
 
     std::optional<Surface> read_surface(std::istream& is)
     {
-        json j;
-        is >> j;
+        //if (is.rdbuf()->in_avail() > 0)
+        {
+            json j;
+            is >> j;
 
-        Surface::Raw_surface raw;
+            Surface::Raw_surface raw;
 
-        const auto& polygons = j["polygons"];
-        std::get<0>(raw).assign(polygons.begin(), polygons.end());
+            const auto& polygons = j["polygons"];
+            std::get<0>(raw).assign(polygons.begin(), polygons.end());
 
-        const auto& indices = j["indices"];
-        std::get<1>(raw).assign(indices.begin(), indices.end());
+            const auto& indices = j["indices"];
+            std::get<1>(raw).assign(indices.begin(), indices.end());
 
-        const auto& vertices = j["vertices"];
-        std::get<2>(raw).assign(vertices.begin(), vertices.end()); 
+            const auto& vertices = j["vertices"];
+            std::get<2>(raw).assign(vertices.begin(), vertices.end());
 
-        return Surface::import_raw(raw);
+            return Surface::import_raw(raw);
+        }
+
+        //return {};
     }
 
     void write_surface(const Surface& surface, std::ostream& os)

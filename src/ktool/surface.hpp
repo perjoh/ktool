@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <vector>
 #include <tuple>
 #include <algorithm>
@@ -7,6 +8,40 @@
 #include <list>
 
 namespace ktool {
+
+    struct Plane
+    {
+        Plane(const glm::vec3& normal_, glm::vec3::value_type d_)
+            : normal(normal_)
+            , d(d_)
+        { 
+        }
+
+        Plane(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
+            : normal(glm::normalize(glm::cross(b - a, c - a)))
+            , d(glm::dot(normal, a))
+        { 
+        }
+
+        bool intersect_segment(const glm::vec3& a, const glm::vec3& b, glm::vec3& q) const
+        {
+            // See: Real-Time Collision Detection, page 176.
+
+            const auto ab = b - a;
+            const auto t = (d - glm::dot(normal, a)) / glm::dot(normal, ab);
+
+            if (!(t < 0.0) && t <= 1.0) {
+                q = a + ab * t;
+                return true;
+            }
+
+            return false; 
+        }
+
+        glm::vec3 normal;
+        glm::vec3::value_type d; 
+    };
+
 
     //
     enum { SIDE_LEFT, SIDE_RIGHT }; 
@@ -120,28 +155,10 @@ namespace ktool {
         // Stored in clockwise order.
         std::vector<It_edge> edges; 
 
-        // Determines which edges is inverted.
-        //unsigned char edge_mask{0};
-
-        /*void set_edge_inverted(std::size_t i) {
-            edge_mask |= (1 << i);
-        }*/
-
-        /*bool is_edge_inverted(std::size_t i) const {
-            return edge_mask & (1 << i);
-        }*/
-
-        // Determines if it's a triangle or a quad.
-        //unsigned int num_edges{0};
-
         //
         bool is_quad() const { return edges.size() == 4; }
 
-        /*It_edge get_edge(std::size_t i) const
-        {
-            return edges[i];
-        }*/
-
+        //
         Edge get_normalized_edge(std::size_t i) const
         { 
             auto second_vertex = edges[i]->vertices[1];
@@ -194,7 +211,7 @@ namespace ktool {
     public :
         Surface() = default;
         Surface(const Surface&);
-        Surface(Surface&&) = default;
+        Surface(Surface&&) noexcept;
 
         static Surface construct_cube();
 
@@ -208,6 +225,7 @@ namespace ktool {
         using Raw_surface = std::tuple<Polygons, Indices, Vertices>;
 
         // Import shape from raw polygon data.
+        [[nodiscard]]
         static Surface import_raw(const Raw_surface&);
 
         // 
@@ -216,9 +234,15 @@ namespace ktool {
     public :
         void scale(const glm::vec3&);
         void offset(const glm::vec3&);
+        void rotate(int axis, float angle_deg);
+        void skew(int axis, float factor);
+
+        std::pair<glm::vec3, glm::vec3> measure() const;
 
     public :
         bool operator==(const Surface&) const;
+
+        Surface& operator=(Surface&&) = default;
 
     private :
         //using It_vertex = std::list<Vertex>::iterator;
@@ -289,12 +313,13 @@ namespace ktool {
         void export_vertices(Consumer& c)
         {
             for (const auto& v : vertices_) {
-                c(v.x, v.y, v.z);
+                const auto& pos = v.position;
+                c(pos.x, pos.y, pos.z);
             } 
         }
 
         //
-        template <typename Consumer>
+        /*template <typename Consumer>
         void export_triangles(Consumer& c)
         {
             for (const auto& q : faces_) {
@@ -307,7 +332,7 @@ namespace ktool {
                 c(e0[0], e1[0], e2[0]);
                 c(e2[0], e3[0], e0[0]);
             }
-        }
+        }*/
 
     private :
         //struct Vertex { float x, y, z; };
@@ -358,7 +383,7 @@ namespace ktool {
         //glm::vec3 edge_point(Index e) const { return edge_point(edges_[edge_index(e)]); } 
 
         //
-        template <typename F>
+        /*template <typename F>
         void for_each_face_sharing_vertex(It_vertex v, F&& f) const {
             auto cur_face = next_face(v);
             const auto end_face = cur_face; 
@@ -369,7 +394,7 @@ namespace ktool {
                     cur_face = Invalid_index;
                 }
             }
-        }
+        }*/
 
         // Traverse each (normalized)edge connected to supplied vertex in clock-wise order.
         // Starting edge is "random", depending on construction order.
@@ -391,7 +416,7 @@ namespace ktool {
         }
 
         //
-        std::vector<It_edge> get_edge_fan(It_vertex v) const
+        /*std::vector<It_edge> get_edge_fan(It_vertex v) const
         {
             std::vector<It_edge> result;
             for_each_edge(v, [this, v, &result] (It_edge e) {
@@ -399,10 +424,10 @@ namespace ktool {
             });
 
             return result;
-        }
+        }*/
 
         //
-        std::vector<Edge> get_edge_fan_norm(It_vertex v, const std::vector<It_edge>& edge_fan) const
+        /*std::vector<Edge> get_edge_fan_norm(It_vertex v, const std::vector<It_edge>& edge_fan) const
         {
             std::vector<Edge> result;
 
@@ -414,17 +439,17 @@ namespace ktool {
                             });
 
             return result;
-        }
+        }*/
 
         //
-        std::vector<Edge> get_edge_fan_norm(It_vertex v) const
+        /*std::vector<Edge> get_edge_fan_norm(It_vertex v) const
         {
             auto indices = get_edge_fan(v);
             return get_edge_fan_norm(v, indices);
-        }
+        }*/
 
         //
-        std::vector<It_face> get_face_fan(It_vertex v) const
+        /*std::vector<It_face> get_face_fan(It_vertex v) const
         {
             auto edges = get_edge_fan_norm(v);
 
@@ -435,7 +460,7 @@ namespace ktool {
             }
 
             return result;
-        }
+        }*/
 
 
         // Pinches specified edge, which results in it being removed. 
@@ -497,8 +522,8 @@ namespace ktool {
             return edge_a->aligned_edge(v).faces[SIDE_RIGHT] == edge_b->aligned_edge(v).faces[SIDE_LEFT];
         }
 
-        //
-        static std::vector<It_edge> edge_fan(Surface& s, It_vertex vertex_it)
+        // Returns edges in clock-wise order.
+        static std::vector<It_edge> edge_fan(const Surface& s, It_vertex vertex_it)
         {
             assert(vertex_it != s.vertices_.end());
 
@@ -515,16 +540,21 @@ namespace ktool {
             return fan;
         }
 
-        //
-        static std::vector<Edge> edge_fan_norm(Surface& s, It_vertex vertex_it)
+        // Edges are in a clock-wise order and normalized relative 'vertex_it'.
+        static std::vector<Edge> edge_fan_norm(const Surface& s, It_vertex vertex_it)
         {
-            auto edges_it = edge_fan(s, vertex_it);
+            return edge_fan_norm(vertex_it, edge_fan(s, vertex_it));
+        }
+
+        //
+        static std::vector<Edge> edge_fan_norm(It_vertex vertex_it, std::vector<It_edge> edges)
+        {
             std::vector<Edge> fan;
-            fan.reserve(edges_it.size());
-            for (auto& edge : edges_it) {
+            fan.reserve(edges.size());
+            for (auto& edge : edges) {
                 fan.push_back(edge->aligned_edge(vertex_it));
             }
-            return fan;
+            return fan; 
         }
 
     };

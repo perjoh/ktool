@@ -3,7 +3,7 @@
 
 TEST_CASE("", "[argparser]")
 {
-    char* argv[3] = {"ktool.exe", "cube", "1.25"};
+    const char* argv[3] = {"ktool.exe", "cube", "1.25"};
 
     const auto args = ktool::args::from_argv(3, argv);
     REQUIRE(args.size() == 3);

@@ -7,26 +7,51 @@
 #include <kgfx/mesh.hpp>
 #include <kgfx/event_handler.hpp>
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
+#include <filesystem>
+
+//
+ktool::Surface read_surface(std::istream& stream)
+{
+    auto opt_surface = ktool::io::read_surface(stream);
+    if (!opt_surface) {
+        throw std::runtime_error("Failed to read surface from stream.");
+    }
+    return std::move(*opt_surface);
+}
 
 //
 ktool::Surface read_surface_stdin()
 {
-    auto opt_surface = ktool::io::read_surface(std::cin);
-    if (!opt_surface.has_value()) {
-        throw std::runtime_error("Failed to read surface from stdin.");
+    return read_surface(std::cin);
+}
+
+//
+ktool::Surface read_surface_file(const std::string& filename)
+{
+    /*klib::io::Resource_file file(filename, std::ios::in);
+    if (file.size() != 0) {
+        return read_surface(file.stream());
+    }*/
+
+    std::filesystem::path p(std::getenv("RESPATH"));
+    std::ifstream file((p/filename).c_str());
+    if (file.is_open()) {
+        return read_surface(file);
     }
-    return opt_surface.value_or(ktool::Surface());
+
+    return {};
 }
 
 //
 class Surface_renderer : public kgfx::Render_system
 {
 public : 
-    Surface_renderer()
+    Surface_renderer(ktool::Surface surface)
     {
         //
-        auto surface = read_surface_stdin();
+        //auto surface = read_surface_stdin();
         surface.to_triangles(); 
         auto mesh = import_surface(surface);
         mesh.set_color(glm::vec3(1.0, 0.0, 0.0));
@@ -62,7 +87,7 @@ private :
     void update(kgfx::Frame_time& frame_time) override
     { 
         static double angle = 0.0;
-        const double delta = frame_time.delta_time_sec()*0.01*2.0*glm::pi<double>();
+        const double delta = frame_time.delta_time_sec()*0.15*2.0*glm::pi<double>();
         angle += delta;
 
         camera_pos_ = glm::vec3(glm::cos(angle)*25.0, 
@@ -133,6 +158,17 @@ void command_offset(const Arguments& args)
 }
 
 //
+void command_rotate(const Arguments& args)
+{
+    if (args.size() == 2) {
+        auto surface = read_surface_stdin();
+        surface.rotate(args[0].value<char>('x') - 'x', args[1].value<float>()); 
+
+        ktool::io::write_surface(surface, std::cout);
+    }
+}
+
+//
 void command_scale(const Arguments& args)
 {
     if (args.size() == 3) {
@@ -140,6 +176,21 @@ void command_scale(const Arguments& args)
         surface.scale(glm::vec3(args[0].value<float>(0),
                                 args[1].value<float>(0),
                                 args[2].value<float>(0)));
+
+        ktool::io::write_surface(surface, std::cout);
+    }
+}
+
+//
+void command_skew(const Arguments& args)
+{
+    if (args.size() == 1) {
+        auto surface = read_surface_stdin();
+        /*surface.scale(glm::vec3(args[0].value<float>(0),
+                                args[1].value<float>(0),
+                                args[2].value<float>(0)));*/
+
+        surface.skew(1, args[0].value<float>(1));
 
         ktool::io::write_surface(surface, std::cout);
     }
@@ -176,24 +227,37 @@ void command_average(const Arguments& args)
 }
 
 //
-void command_view(const Arguments&)
-{
-    kgfx::Event_handler event_handler;
+void display_surface(ktool::Surface surface)
+{ 
+    if (surface.vertex_count() != 0) {
 
-    kgfx::opengl::Renderer renderer;
-    renderer.construct_windowed(800, 600, "ktool viewer");
+        kgfx::Event_handler event_handler;
 
-    Surface_renderer surface_renderer;
-    renderer.add_render_system(&surface_renderer);
+        kgfx::opengl::Renderer renderer;
+        renderer.construct_windowed(800, 600, "ktool viewer");
 
-    // 
-    while (event_handler.poll_events()) {
-        renderer.run_frame();
+        Surface_renderer surface_renderer(std::move(surface));
+        renderer.add_render_system(&surface_renderer);
+
+        // 
+        while (event_handler.poll_events()) {
+            renderer.run_frame();
+        }
     }
 }
 
 //
-int main(int argc, char* argv[])
+void command_view(const Arguments& args)
+{
+    if (args.size() > 0) {
+        display_surface(read_surface_file(args[0].value<std::string>()));
+    } else { 
+        display_surface(read_surface_stdin());
+    }
+}
+
+//
+int main(int argc, const char* argv[])
 {
     try
     {
@@ -201,14 +265,16 @@ int main(int argc, char* argv[])
 
         parser.register_command("cube", &command_cube, "[size] Construct a cube.");
         parser.register_command("offset", &command_offset, "[x y z] Offset surface by xyz.");
+        parser.register_command("rot", &command_rotate, "[x|y|z] [angle] Rotate along axis.");
         parser.register_command("scale", &command_scale, "[x y z] Scale surface by xyz.");
+        parser.register_command("skew", &command_skew, "[scale] Skew scale along y axis.");
         parser.register_command("subdiv", &command_subdivide, "[count] Sub divide surface by count times.");
         parser.register_command("avg", &command_average, "Average(smooth) surface.");
-        parser.register_command("view", &command_view, "Render surface.");
+        parser.register_command("view", &command_view, "Render surface. Reads from file if supplied, stdin otherwise.");
 
         parser.run_command(); 
     }
-    catch (const std::runtime_error& e)
+    catch (const std::exception& e)
     {
         std::cerr << "EXCEPTION: " << e.what() << '\n';
         return 1;
