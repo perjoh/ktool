@@ -3,5 +3,4 @@ project(ktool)
 
 enable_testing()
 add_subdirectory(external/kgfx)
-add_subdirectory(src/${PROJECT_NAME})
-
+add_subdirectory(src/${PROJECT_NAME}) 
